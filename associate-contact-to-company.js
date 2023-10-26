@@ -1,3 +1,5 @@
+// This workflow requires no properties to include. It uses Hubspots API. You just need to create the secret key and use the name HUBSPOTTOKEN as the secret key name.
+
 const hubspot = require('@hubspot/api-client');
 
 exports.main = async (event, callback) => {
