@@ -1,87 +1,71 @@
-// This workflow requires no properties to include. It uses Hubspots API. You just need to create the secret key and use the name HUBSPOTTOKEN as the secret key name.
+// This workflow requires no properties to include. It uses Hubspots API and throttles the API to avoid errors due to Hubspots rate limiting. You just need to create the secret key and use the name HUBSPOTTOKEN as the secret key name.
 
 const hubspot = require('@hubspot/api-client');
 
+function delay(duration) {
+  return new Promise(resolve => setTimeout(resolve, duration));
+}
+
 exports.main = async (event, callback) => {
-  
   // Instantiate a new HubSpot API client using the HAPI key (secret)
   const hubspotClient = new hubspot.Client({
     accessToken: process.env.HUBSPOTTOKEN
   });
+
+try {
+  const contactId = event.object.objectId;
+  const contactProperties = ["company_id"];
   
-  let contactId = event.object.objectId;
+  // Retrive the currently enrolled contacts "Company ID" property
+  const contactResults = await hubspotClient.crm.contacts.basicApi.getById(contactId, contactProperties);
+  let myCompanyID = contactResults.properties.company_id; // Get data from the results and store in variables
+  
+  // Create search criteria  
+  const filter = { propertyName: 'tc_company_id', operator: 'EQ', value: myCompanyID }
+  const filterGroup = { filters:	[filter] 	}
+  const sort = JSON.stringify({ propertyName: 'tc_company_id', direction: 'DESCENDING'})
+  const properties = [ 'name', 'tc_company_id' ]
+  const limit = 1
+  const after = 0
 
-// Retrive the currently enrolled contacts "company" property
-  hubspotClient.crm.contacts.basicApi
-    .getById(contactId, ["company"])
-    .then(results => {
-	// Get data from the results and store in variables
-	let companyName = results.properties.company;
-        console.log("SEARCH TERM: " + companyName);
-    console.log("Contact ID: " + contactId);
+  const searchCriteria = {
+    filterGroups: [filterGroup],
+    sorts: [sort],
+    properties,
+    limit,
+    after
+  }
+  
+  // Throttle the request: wait for a specified time before proceeding
+  await delay(100); // Wait 100 milliseconds before the search request
+     
+  // Search the CRM via API call for Companies matching "myCompanyID" variable defined earlier
+  const searchCompanyResponse = await hubspotClient.crm.companies.searchApi.doSearch(searchCriteria);
 
-	// Create search criteria   
-	const filter = { propertyName: 'name', operator: 'EQ', value: companyName }
-	const filterGroup = { filters:	[filter] 	}
-        const sort = JSON.stringify({ propertyName: 'name', direction: 'DESCENDING'})
-        const properties = ['name']
-        const limit = 1
-        const after = 0
-        
-        const searchCriteria = {
-          filterGroups: [filterGroup],
-          sorts: [sort],
-          properties,
-          limit,
-          after
-        }
-    
-      // Search the CRM for Companies matching "companyName" variable defined earlier
-      hubspotClient.crm.companies.searchApi.doSearch(searchCriteria).then(searchCompanyResponse => {
-        
-         console.log("RESULTS: " + searchCompanyResponse.total); // - FOR DEBUG
- 
-         // If total equals 0 no results found
-         if(searchCompanyResponse.total == 0){ //NO MATCH FOUND - CREATE COMPANY AND ASSOCIATE
-           console.log("COMPANY " + companyName  + "NOT FOUND: CREATE + ASSOCIATE") // - FOR DEBUG
-           
-           //Create a Company object
-            const companyObj = {
-                properties: {
-                    name: companyName,
-                },
-            }
-           
-           //Create the Company using Company object above
-           hubspotClient.crm.companies.basicApi.create(companyObj).then(companyCreateResponse =>{
-             //Associate Company with Contact using the ID returned from the previous request
-             hubspotClient.crm.companies.associationsApi.create(companyCreateResponse.id,'contacts', contactId,'company_to_contact');
-           });
-           
-         }else{ // MATCH FOUND - ASSOCIATE COMPANY TO CONTACT
-           let rs_company_id = searchCompanyResponse.results[0].id;
-            console.log("COMPANY " + companyName + " FOUND: ASSOCIATE RECORDS"); // - FOR DEBUG
-           console.log("Contact ID: " + contactId); // - FOR DEBUG
-           console.log("Company ID: " + rs_company_id); // - FOR DEBUG
-          //Associate Company with Contact
-           hubspotClient.crm.companies.associationsApi.create(
-             rs_company_id,
-             'contacts', 
-             contactId,
-             [
-              {
-                "associationCategory": "HUBSPOT_DEFINED",
-                "associationTypeId": 2 
-              }
-            ]
-           );
-         }
-      });
-   
-      callback({outputFields: {}});
-    
-    })
-    .catch(err => {
-      console.error(err);
-    });
-}
+    if ( searchCompanyResponse.total >= 1 ) {
+      let company_record_id = searchCompanyResponse.results[0].id;
+      
+      // Throttle the request: wait for a specified time before proceeding
+      await delay(100); // Wait 100 milliseconds before the association request
+
+      // Call the API to associate the company with the contact
+      await hubspotClient.crm.companies.associationsApi.create(
+        company_record_id,
+        'contacts', 
+        contactId,
+        [
+          {
+            "associationCategory": "HUBSPOT_DEFINED",
+            "associationTypeId": 2 
+          }
+        ]
+       );
+    }
+  
+  callback({ outputFields: {} });
+      
+  } catch (err) {
+    console.log(err);
+    throw err;
+  }
+};
