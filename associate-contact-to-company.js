@@ -22,7 +22,7 @@ try {
   
   // Create search criteria  
   const filter = { propertyName: 'tc_company_id', operator: 'EQ', value: myCompanyID }
-  const filterGroup = { filters:	[filter] 	}
+  const filterGroup = { filters: [filter] }
   const sort = JSON.stringify({ propertyName: 'tc_company_id', direction: 'DESCENDING'})
   const properties = [ 'name', 'tc_company_id' ]
   const limit = 1
