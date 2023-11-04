@@ -1,4 +1,4 @@
-// This workflow requires no properties to include and connects to Hubspots API. You just need to create the secret key and use the name HUBSPOTTOKEN as the secret key name.
+// This workflow requires no properties to include and connects to Hubspots API. This code accounts for Rate Limit for all Hubs and the Search API. You just need to create the secret key and use the name HUBSPOTTOKEN as the secret key name.
 
 const hubspot = require('@hubspot/api-client');
 
