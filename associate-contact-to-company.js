@@ -37,7 +37,7 @@ try {
   }
   
   // Throttle the request: wait for a specified time before proceeding
-  await delay(100); // Wait 100 milliseconds before the search request
+  await delay(400); // Wait 400 milliseconds before the search request
      
   // Search the CRM via API call for Companies matching "myCompanyID" variable defined earlier
   const searchCompanyResponse = await hubspotClient.crm.companies.searchApi.doSearch(searchCriteria);
